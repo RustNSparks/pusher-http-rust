@@ -3,7 +3,7 @@ name = "pusher-http-rust"
 version = "1.0.0"
 edition = "2024"
 description = "A Rust client for interacting with the Pusher HTTP API"
-license = "AGPL"
+license-file = "LICENSE"
 
 [dependencies]
 reqwest = { version = "0.11", features = ["json"] }
