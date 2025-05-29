@@ -1,8 +1,8 @@
 [package]
-name = "pusher-rust"
-version = "0.1.0"
+name = "pusher-http-rust"
+version = "1.0.0"
 edition = "2024"
-description = "Pusher http library made in rust"
+description = "A Rust client for interacting with the Pusher HTTP API"
 license = "AGPL"
 
 [dependencies]

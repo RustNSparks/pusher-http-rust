@@ -813,8 +813,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "pusher-rust"
-version = "0.1.0"
+name = "pusher-http-rust"
+version = "1.0.0"
 dependencies = [
  "base64",
  "hex",
