@@ -23,7 +23,7 @@ Add the following to your `Cargo.toml`:
 ```toml
 [dependencies]
 # If publishing to crates.io:
-# pusher-http-rust = "0.1.0" # Replace with the desired version
+# pushers = "1.0.0" # Replace with the desired version
 # Or, for local development:
 # pusher-http-rust = { path = "../path/to/pusher-http-rust" }
 
@@ -46,7 +46,7 @@ cargo build
 Configure and create a `Pusher` client:
 
 ```rust
-use pusher_http_rust::{Config, Pusher, PusherError};
+use pushers::{Config, Pusher, PusherError};
 
 #[tokio::main]
 async fn main() -> Result<(), PusherError> {
@@ -96,7 +96,7 @@ If `channels` contains a single encrypted channel (e.g. `"private-encrypted-mych
 
 **Excluding a recipient**  
 ```rust
-use pusher_http_rust::events::TriggerParams;
+use pushers::events::TriggerParams;
 
 let params = TriggerParams {
     socket_id: Some("socket_id_to_exclude".to_string()),
@@ -111,7 +111,7 @@ pusher
 ### 3. Triggering Batch Events
 
 ```rust
-use pusher_http_rust::events::BatchEvent;
+use pushers::events::BatchEvent;
 use serde_json::json;
 
 let batch = vec![
