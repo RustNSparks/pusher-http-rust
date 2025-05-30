@@ -1,5 +1,5 @@
 [package]
-name = "pusher-http-rust"
+name = "pusher_http_rust"
 version = "1.0.0"
 edition = "2024"
 description = "A Rust client for interacting with the Pusher HTTP API"
