@@ -10,12 +10,22 @@ pub mod pusher;
 pub mod token;
 pub mod util;
 pub mod webhook;
+pub mod channel;
+
+#[macro_use]
+extern crate zeroize;
+
 
 pub use pusher::Pusher;
-pub use config::Config;
+pub use config::{Config, ConfigBuilder};
 pub use errors::{PusherError, RequestError, WebhookError};
 pub use token::Token;
-pub use webhook::Webhook;
+pub use webhook::{Webhook, WebhookEvent};
+pub use channel::{Channel, ChannelName, ChannelType};
 
 /// Result type alias for Pusher operations
 pub type Result<T> = std::result::Result<T, PusherError>;
+
+// Re-export commonly used types
+pub use events::{Event, BatchEvent, TriggerParams};
+pub use auth::{SocketAuth, UserAuth};

@@ -47,7 +47,7 @@ pub fn get_socket_signature(
 
     // Handle encrypted channels
     if util::is_encrypted_channel(channel) {
-        if pusher.config().encryption_master_key.is_none() {
+        if pusher.config().encryption_master_key().is_none() {
             return Err(crate::PusherError::Encryption {
                 message: "Cannot generate shared_secret because encryptionMasterKey is not set".to_string(),
             });
