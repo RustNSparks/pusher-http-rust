@@ -23,9 +23,9 @@ Add the following to your `Cargo.toml`:
 ```toml
 [dependencies]
 # If publishing to crates.io:
-# pushers = "1.0.0" # Replace with the desired version
+# pushers = "1.2.0" # Replace with the desired version
 # Or, for local development:
-pusher-http-rust = { path = "./" } # Assuming the crate is in the current directory or adjust path accordingly
+pushers = { path = "./" } # Assuming the crate is in the current directory or adjust path accordingly
 
 serde_json = "1.0"
 tokio = { version = "1", features = ["full"] }
