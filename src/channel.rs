@@ -36,7 +36,7 @@ impl ChannelName {
     pub fn new(name: impl Into<String>) -> Result<Self> {
         let name = name.into();
         validate_channel_name(&name)?;
-        Ok(Self(name))
+        Ok(Self(name.to_owned()))
     }
 
     /// Gets the channel name as a string slice
