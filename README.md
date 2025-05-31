@@ -47,7 +47,7 @@ cargo build
 Configure and create a `Pusher` client:
 
 ```rust
-use pusher_http_rust::{Config, Pusher, PusherError}; // Adjusted to use crate name
+use pushers::{Config, Pusher, PusherError}; // Adjusted to use crate name
 
 #[tokio::main]
 async fn main() -> Result<(), PusherError> {
@@ -75,7 +75,7 @@ async fn main() -> Result<(), PusherError> {
 You can also initialize from a Pusher URL:
 
 ```rust
-use pusher_http_rust::{Pusher, PusherError}; // Adjusted
+use pushers::{Pusher, PusherError}; // Adjusted
 
 # #[tokio::main]
 # async fn main() -> Result<(), PusherError> {
@@ -91,7 +91,7 @@ let pusher_from_url = Pusher::from_url(
 ### 2. Triggering Events
 
 ```rust
-use pusher_http_rust::{Pusher, Channel, PusherError}; // Adjusted
+use pushers::{Pusher, Channel, PusherError}; // Adjusted
 use serde_json::json;
 
 # async fn doc_trigger_event(pusher: &Pusher) -> Result<(), PusherError> {
@@ -116,7 +116,7 @@ If `channels` contains a single encrypted channel (e.g. `"private-encrypted-mych
 
 **Excluding a recipient**
 ```rust
-use pusher_http_rust::{Pusher, Channel, PusherError, events::TriggerParams}; // Adjusted
+use pushers::{Pusher, Channel, PusherError, events::TriggerParams}; // Adjusted
 use serde_json::json;
 
 # async fn doc_trigger_event_exclude(pusher: &Pusher) -> Result<(), PusherError> {
@@ -139,7 +139,7 @@ pusher
 ### 3. Triggering Batch Events
 
 ```rust
-use pusher_http_rust::{Pusher, PusherError, events::BatchEvent}; // Adjusted
+use pushers::{Pusher, PusherError, events::BatchEvent}; // Adjusted
 use serde_json::json;
 
 # async fn doc_trigger_batch(pusher: &Pusher) -> Result<(), PusherError> {
@@ -174,7 +174,7 @@ match pusher.trigger_batch(batch).await {
 Typically done in your HTTP handler when a client attempts to subscribe:
 
 ```rust
-use pusher_http_rust::{Pusher, Channel, PusherError}; // Adjusted
+use pushers::{Pusher, Channel, PusherError}; // Adjusted
 use serde_json::json;
 
 # fn doc_authorize_channel(pusher: &Pusher) -> Result<(), PusherError> {
@@ -211,7 +211,7 @@ match pusher.authorize_channel(
 For server-to-user events:
 
 ```rust
-use pusher_http_rust::{Pusher, PusherError}; // Adjusted
+use pushers::{Pusher, PusherError}; // Adjusted
 use serde_json::json;
 
 # fn doc_authenticate_user(pusher: &Pusher) -> Result<(), PusherError> {
@@ -238,7 +238,7 @@ match pusher.authenticate_user(socket_id, &user_data) {
 ### 6. Sending an Event to a User
 
 ```rust
-use pusher_http_rust::{Pusher, PusherError}; // Adjusted
+use pushers::{Pusher, PusherError}; // Adjusted
 use serde_json::json;
 
 # async fn doc_send_to_user(pusher: &Pusher) -> Result<(), PusherError> {
@@ -258,7 +258,7 @@ match pusher.send_to_user(user_id, event_name, data).await { // Pass data direct
 ### 7. Terminating User Connections
 
 ```rust
-use pusher_http_rust::{Pusher, PusherError}; // Adjusted
+use pushers::{Pusher, PusherError}; // Adjusted
 
 # async fn doc_terminate_user(pusher: &Pusher) -> Result<(), PusherError> {
 let user_id = "user-charlie";
@@ -275,7 +275,7 @@ match pusher.terminate_user_connections(user_id).await {
 ### 8. Handling Webhooks
 
 ```rust
-use pusher_http_rust::{Pusher, PusherError, webhook::WebhookEvent}; // Adjusted
+use pushers::{Pusher, PusherError, webhook::WebhookEvent}; // Adjusted
 use std::collections::BTreeMap;
 
 # fn doc_handle_webhook(pusher: &Pusher) -> Result<(), PusherError> {
@@ -334,7 +334,7 @@ use axum::{
     routing::post,
     Router,
 };
-use pusher_http_rust::{Config, Pusher, PusherError, Channel}; // Adjusted imports
+use pushers::{Config, Pusher, PusherError, Channel}; // Adjusted imports
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{collections::BTreeMap, sync::Arc};
