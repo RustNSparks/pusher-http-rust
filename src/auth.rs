@@ -115,7 +115,7 @@ mod tests {
             .app_id("test")
             .key("test_key")
             .secret("test_secret")
-            .encryption_master_key_base64("aSBhbSAzMiBieXRlcyBsb25nIGVuY3J5cHRpb24ga2V5")
+            .encryption_master_key_base64("MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=")
             .unwrap()
             .build()
             .unwrap();

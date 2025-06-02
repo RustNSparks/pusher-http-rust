@@ -1,6 +1,6 @@
 [package]
 name = "pushers"
-version = "1.4.0"
+version = "1.4.1"
 edition = "2021"
 repository = "https://github.com/RustNSparks/pusher-http-rust"
 description = "A Rust client for interacting with the Pusher HTTP API"
