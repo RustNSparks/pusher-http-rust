@@ -1,7 +1,7 @@
-use serde::{Serialize, Deserialize};
+use crate::{Channel, Pusher, PusherError, Result};
+use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
-use crate::{Pusher, PusherError, Result, Channel};
 use std::fmt;
 
 #[cfg(all(feature = "encryption", feature = "sodiumoxide"))]
@@ -48,8 +48,7 @@ impl EventData {
     /// Gets the event data as a JSON value
     pub fn as_json(&self) -> Result<Value> {
         match self {
-            EventData::String(s) => serde_json::from_str(s)
-                .map_err(|e| PusherError::Json(e)),
+            EventData::String(s) => serde_json::from_str(s).map_err(|e| PusherError::Json(e)),
             EventData::Json(v) => Ok(v.clone()),
         }
     }
@@ -195,29 +194,38 @@ fn encrypt_sodiumoxide(pusher: &Pusher, channel: &str, data: &EventData) -> Resu
     init_sodium()?;
 
     // Ensure master key is present
-    let _master_key = pusher.config().encryption_master_key()
-        .ok_or_else(|| PusherError::Encryption {
-            message: "Set encryptionMasterKey before triggering events on encrypted channels".to_string(),
-        })?;
+    let _master_key =
+        pusher
+            .config()
+            .encryption_master_key()
+            .ok_or_else(|| PusherError::Encryption {
+                message: "Set encryptionMasterKey before triggering events on encrypted channels"
+                    .to_string(),
+            })?;
 
     // Generate a random nonce
-    let nonce_bytes = sodiumoxide::randombytes::randombytes(sodiumoxide::crypto::secretbox::NONCEBYTES);
-    let nonce = sodiumoxide::crypto::secretbox::Nonce::from_slice(&nonce_bytes)
-        .ok_or_else(|| PusherError::Encryption {
-            message: "Failed to create nonce from random bytes".to_string(),
+    let nonce_bytes =
+        sodiumoxide::randombytes::randombytes(sodiumoxide::crypto::secretbox::NONCEBYTES);
+    let nonce =
+        sodiumoxide::crypto::secretbox::Nonce::from_slice(&nonce_bytes).ok_or_else(|| {
+            PusherError::Encryption {
+                message: "Failed to create nonce from random bytes".to_string(),
+            }
         })?;
 
     // Get channel shared secret
     let shared_secret_bytes = pusher.channel_shared_secret(channel)?;
 
     // Convert to cryptographic Key type
-    let key = sodiumoxide::crypto::secretbox::Key::from_slice(&shared_secret_bytes)
-        .ok_or_else(|| PusherError::Encryption {
-            message: format!(
-                "Channel shared secret must be {} bytes long, but was {} bytes.",
-                sodiumoxide::crypto::secretbox::KEYBYTES,
-                shared_secret_bytes.len()
-            ),
+    let key =
+        sodiumoxide::crypto::secretbox::Key::from_slice(&shared_secret_bytes).ok_or_else(|| {
+            PusherError::Encryption {
+                message: format!(
+                    "Channel shared secret must be {} bytes long, but was {} bytes.",
+                    sodiumoxide::crypto::secretbox::KEYBYTES,
+                    shared_secret_bytes.len()
+                ),
+            }
         })?;
 
     // Get data as bytes
@@ -245,26 +253,32 @@ fn encrypt_pure_rust(pusher: &Pusher, channel: &str, data: &EventData) -> Result
     };
 
     // Ensure master key is present
-    let _master_key = pusher.config().encryption_master_key()
-        .ok_or_else(|| PusherError::Encryption {
-            message: "Set encryptionMasterKey before triggering events on encrypted channels".to_string(),
-        })?;
+    let _master_key =
+        pusher
+            .config()
+            .encryption_master_key()
+            .ok_or_else(|| PusherError::Encryption {
+                message: "Set encryptionMasterKey before triggering events on encrypted channels"
+                    .to_string(),
+            })?;
 
     // Get channel shared secret
     let shared_secret_bytes = pusher.channel_shared_secret(channel)?;
 
     // Create cipher
-    let cipher = ChaCha20Poly1305::new_from_slice(&shared_secret_bytes)
-        .map_err(|_| PusherError::Encryption {
+    let cipher = ChaCha20Poly1305::new_from_slice(&shared_secret_bytes).map_err(|_| {
+        PusherError::Encryption {
             message: "Failed to create cipher from shared secret".to_string(),
-        })?;
+        }
+    })?;
 
     // Generate random nonce
     let nonce = ChaCha20Poly1305::generate_nonce(&mut OsRng);
 
     // Encrypt the data
     let data_string = data.to_string();
-    let ciphertext = cipher.encrypt(&nonce, data_string.as_bytes())
+    let ciphertext = cipher
+        .encrypt(&nonce, data_string.as_bytes())
         .map_err(|_| PusherError::Encryption {
             message: "Encryption failed".to_string(),
         })?;
@@ -305,9 +319,7 @@ pub async fn trigger<D: Into<EventData>>(
     }
 
     // Convert channels to strings
-    let channel_strings: Vec<String> = channels.iter()
-        .map(|c| c.full_name())
-        .collect();
+    let channel_strings: Vec<String> = channels.iter().map(|c| c.full_name()).collect();
 
     if channels.len() == 1 && channels[0].is_encrypted() {
         #[cfg(feature = "encryption")]
@@ -342,7 +354,9 @@ pub async fn trigger<D: Into<EventData>>(
         for channel in channels {
             if channel.is_encrypted() {
                 return Err(PusherError::Validation {
-                    message: "You cannot trigger to multiple channels when using encrypted channels".to_string(),
+                    message:
+                        "You cannot trigger to multiple channels when using encrypted channels"
+                            .to_string(),
                 });
             }
         }
@@ -373,9 +387,7 @@ pub async fn trigger_on_channels<D: Into<EventData>>(
     data: D,
     params: Option<&TriggerParams>,
 ) -> Result<reqwest::Response> {
-    let channels: Result<Vec<Channel>> = channels.iter()
-        .map(|c| Channel::from_string(c))
-        .collect();
+    let channels: Result<Vec<Channel>> = channels.iter().map(|c| Channel::from_string(c)).collect();
     let channels = channels?;
     trigger(pusher, &channels, event_name, data, params).await
 }

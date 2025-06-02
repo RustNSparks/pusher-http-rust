@@ -1,14 +1,13 @@
+use crate::{
+    auth, events, util, webhook::Webhook, Channel, Config, PusherError, RequestError, Result, Token,
+};
+use events::EventData;
+use reqwest::{Client, Response};
+use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::time::Duration;
-use reqwest::{Client, Response};
-use serde_json::{json, Value};
-use sha2::{Sha256, Digest};
-use events::EventData;
-use crate::{
-    Config, Token, auth, events, util, webhook::Webhook,
-    PusherError, RequestError, Result, Channel,
-};
 
 /// Main Pusher client
 #[derive(Clone)]
@@ -25,7 +24,7 @@ impl Pusher {
     /// Creates a new Pusher client
     pub fn new(config: Config) -> Result<Self> {
         config.validate()?;
-        
+
         let client = Client::builder()
             .timeout(config.timeout())
             .pool_max_idle_per_host(config.pool_max_idle_per_host())
@@ -33,7 +32,7 @@ impl Pusher {
             .map_err(|e| PusherError::Config {
                 message: format!("Failed to build HTTP client: {}", e),
             })?;
-            
+
         Ok(Self {
             inner: Arc::new(PusherInner { config, client }),
         })
@@ -41,10 +40,9 @@ impl Pusher {
 
     /// Creates a Pusher client from URL
     pub fn from_url(url: &str, additional_config: Option<Config>) -> Result<Self> {
-        let parsed_url = url::Url::parse(url)
-            .map_err(|e| PusherError::Config {
-                message: format!("Invalid Pusher URL: {}", e),
-            })?;
+        let parsed_url = url::Url::parse(url).map_err(|e| PusherError::Config {
+            message: format!("Invalid Pusher URL: {}", e),
+        })?;
 
         let auth_parts: Vec<&str> = parsed_url.username().split(':').collect();
         if auth_parts.len() != 2 {
@@ -54,7 +52,8 @@ impl Pusher {
         }
 
         let path_segments: Vec<&str> = parsed_url.path().split('/').collect();
-        let app_id = path_segments.last()
+        let app_id = path_segments
+            .last()
             .and_then(|s| if !s.is_empty() { Some(s) } else { None })
             .ok_or_else(|| PusherError::Config {
                 message: "App ID not found in URL path".to_string(),
@@ -97,7 +96,7 @@ impl Pusher {
     pub fn config(&self) -> &Config {
         &self.inner.config
     }
-    
+
     /// Creates a new Pusher client for a specific cluster
     pub fn for_cluster(&self, cluster: &str) -> Result<Self> {
         let config = Config::builder()
@@ -111,7 +110,7 @@ impl Pusher {
             .enable_retry(self.inner.config.enable_retry())
             .max_retries(self.inner.config.max_retries())
             .build()?;
-        
+
         Self::new(config)
     }
 
@@ -123,7 +122,13 @@ impl Pusher {
         data: Option<&Value>,
     ) -> Result<auth::SocketAuth> {
         util::validate_socket_id(socket_id)?;
-        auth::get_socket_signature(self, &self.inner.config.token(), &channel.full_name(), socket_id, data)
+        auth::get_socket_signature(
+            self,
+            &self.inner.config.token(),
+            &channel.full_name(),
+            socket_id,
+            data,
+        )
     }
 
     /// Authorizes a channel by name (convenience method)
@@ -138,13 +143,9 @@ impl Pusher {
     }
 
     /// Authenticates a user
-    pub fn authenticate_user(
-        &self,
-        socket_id: &str,
-        user_data: &Value,
-    ) -> Result<auth::UserAuth> {
+    pub fn authenticate_user(&self, socket_id: &str, user_data: &Value) -> Result<auth::UserAuth> {
         util::validate_socket_id(socket_id)?;
-        
+
         // Validate user data has ID
         if let Some(id) = user_data.get("id") {
             if let Some(id_str) = id.as_str() {
@@ -175,9 +176,9 @@ impl Pusher {
                 message: format!("Event name too long: '{}' (max 200 characters)", event),
             });
         }
-        
+
         util::validate_user_id(user_id)?;
-        
+
         let channel_name = format!("#server-to-user-{}", user_id);
         let channel = Channel::from_string(channel_name)?;
         events::trigger(self, &[channel], event, data, None).await
@@ -218,7 +219,10 @@ impl Pusher {
 
         if channels.len() > 100 {
             return Err(PusherError::Validation {
-                message: format!("Can't trigger to more than 100 channels (got {})", channels.len()),
+                message: format!(
+                    "Can't trigger to more than 100 channels (got {})",
+                    channels.len()
+                ),
             });
         }
 
@@ -233,17 +237,15 @@ impl Pusher {
         data: D,
         params: Option<events::TriggerParams>,
     ) -> Result<Response> {
-        let channels: Result<Vec<Channel>> = channel_names.iter()
+        let channels: Result<Vec<Channel>> = channel_names
+            .iter()
             .map(|name| Channel::from_string(name))
             .collect();
         self.trigger(&channels?, event, data, params).await
     }
 
     /// Triggers a batch of events
-    pub async fn trigger_batch(
-        &self,
-        batch: Vec<events::BatchEvent>,
-    ) -> Result<Response> {
+    pub async fn trigger_batch(&self, batch: Vec<events::BatchEvent>) -> Result<Response> {
         events::trigger_batch(self, batch).await
     }
 
@@ -268,15 +270,18 @@ impl Pusher {
 
     /// Generates channel shared secret for encryption
     pub fn channel_shared_secret(&self, channel: &str) -> Result<[u8; 32]> {
-        let master_key = self.inner.config.encryption_master_key()
-            .ok_or_else(|| PusherError::Encryption {
-                message: "Encryption master key not set".to_string(),
-            })?;
+        let master_key =
+            self.inner
+                .config
+                .encryption_master_key()
+                .ok_or_else(|| PusherError::Encryption {
+                    message: "Encryption master key not set".to_string(),
+                })?;
 
         let mut hasher = Sha256::new();
         hasher.update(channel.as_bytes());
         hasher.update(master_key);
-        
+
         let result = hasher.finalize();
         let mut secret = [0u8; 32];
         secret.copy_from_slice(&result);
@@ -304,7 +309,7 @@ impl Pusher {
     ) -> Result<Response> {
         let full_path = self.inner.config.prefix_path(path);
         let body_str = body.map(|b| serde_json::to_string(b)).transpose()?;
-        
+
         let query_string = create_signed_query_string(
             &self.inner.config.token(),
             method,
@@ -312,50 +317,57 @@ impl Pusher {
             body_str.as_deref(),
             params,
         );
-        
-        let url = format!("{}{}?{}", self.inner.config.base_url(), full_path, query_string);
-        
+
+        let url = format!(
+            "{}{}?{}",
+            self.inner.config.base_url(),
+            full_path,
+            query_string
+        );
+
         let mut attempt = 0;
         let max_attempts = if self.inner.config.enable_retry() {
             self.inner.config.max_retries() + 1
         } else {
             1
         };
-    
+
         loop {
             attempt += 1;
-            
+
             let mut request = match method {
                 "GET" => self.inner.client.get(&url),
                 "POST" => self.inner.client.post(&url),
-                _ => return Err(PusherError::Request(RequestError::new(
-                    format!("Unsupported HTTP method: {}", method),
-                    &url,
-                    None,
-                    None,
-                ))),
+                _ => {
+                    return Err(PusherError::Request(RequestError::new(
+                        format!("Unsupported HTTP method: {}", method),
+                        &url,
+                        None,
+                        None,
+                    )))
+                }
             };
-    
+
             if let Some(ref body_str) = body_str {
                 request = request
                     .header("Content-Type", "application/json")
                     .body(body_str.clone());
             }
-    
+
             let response = request
                 .header("X-Pusher-Library", "pushers/1.4.2")
                 .send()
                 .await;
-    
+
             match response {
                 Ok(resp) => {
                     if resp.status().is_success() {
                         return Ok(resp);
                     }
-                    
+
                     let status = resp.status().as_u16();
                     let body = resp.text().await.unwrap_or_default();
-                    
+
                     // Don't retry on 4xx errors (client errors)
                     if status >= 400 && status < 500 {
                         return Err(PusherError::Request(RequestError::new(
@@ -365,7 +377,7 @@ impl Pusher {
                             Some(body),
                         )));
                     }
-                    
+
                     // Retry on 5xx errors if enabled
                     if attempt >= max_attempts {
                         return Err(PusherError::Request(RequestError::new(
@@ -383,7 +395,7 @@ impl Pusher {
                     }
                 }
             }
-            
+
             // Exponential backoff: 100ms, 200ms, 400ms, etc.
             let delay = Duration::from_millis(100 * (1 << (attempt - 1)));
             tokio::time::sleep(delay).await;
@@ -422,7 +434,7 @@ fn create_signed_query_string(
     let query_string = util::to_ordered_array(&query_params).join("&");
     let sign_data = format!("{}\n{}\n{}", method.to_uppercase(), path, query_string);
     let signature = token.sign(&sign_data);
-    
+
     format!("{}&auth_signature={}", query_string, signature)
 }
 
@@ -449,8 +461,12 @@ mod tests {
     async fn test_authorize_channel() {
         let config = Config::new("123", "key", "secret");
         let pusher = Pusher::new(config).unwrap();
-        
-        let result = pusher.authorize_channel("123.456", &Channel::from_string("test-channel").unwrap(), None);
+
+        let result = pusher.authorize_channel(
+            "123.456",
+            &Channel::from_string("test-channel").unwrap(),
+            None,
+        );
         assert!(result.is_ok());
     }
 
@@ -458,7 +474,7 @@ mod tests {
     fn test_for_cluster() {
         let config = Config::new("123", "key", "secret");
         let pusher = Pusher::new(config).unwrap();
-        
+
         let eu_pusher = pusher.for_cluster("eu").unwrap();
         assert_eq!(eu_pusher.config().host(), "api-eu.pusher.com");
     }

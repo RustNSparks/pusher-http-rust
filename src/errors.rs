@@ -4,22 +4,22 @@ use thiserror::Error;
 pub enum PusherError {
     #[error("Request error: {0}")]
     Request(#[from] RequestError),
-    
+
     #[error("Webhook error: {0}")]
     Webhook(#[from] WebhookError),
-    
+
     #[error("Configuration error: {message}")]
     Config { message: String },
-    
+
     #[error("Validation error: {message}")]
     Validation { message: String },
-    
+
     #[error("Encryption error: {message}")]
     Encryption { message: String },
-    
+
     #[error("JSON error: {0}")]
     Json(#[from] serde_json::Error),
-    
+
     #[error("HTTP error: {0}")]
     Http(#[from] reqwest::Error),
 }

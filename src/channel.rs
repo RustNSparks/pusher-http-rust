@@ -1,6 +1,6 @@
+use crate::{PusherError, Result};
 use std::fmt;
 use std::str::FromStr;
-use crate::{PusherError, Result};
 
 /// Type-safe channel representation
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -75,10 +75,12 @@ impl Channel {
     /// Creates a channel from a string, automatically detecting the type
     pub fn from_string(s: impl Into<String>) -> Result<Self> {
         let s = s.into();
-        
+
         if s.starts_with("private-encrypted-") {
             let name = s.strip_prefix("private-encrypted-").unwrap();
-            Ok(Channel::Encrypted(EncryptedChannel(ChannelName::new(name)?)))
+            Ok(Channel::Encrypted(EncryptedChannel(ChannelName::new(
+                name,
+            )?)))
         } else if s.starts_with("presence-") {
             let name = s.strip_prefix("presence-").unwrap();
             Ok(Channel::Presence(PresenceChannel(ChannelName::new(name)?)))
@@ -161,12 +163,11 @@ impl EncryptedChannel {
 }
 
 // Validation moved here from util.rs
-use std::sync::LazyLock;
 use regex::Regex;
+use std::sync::LazyLock;
 
-static CHANNEL_NAME_PATTERN: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"^[A-Za-z0-9_\-=@,.;]+$").unwrap()
-});
+static CHANNEL_NAME_PATTERN: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^[A-Za-z0-9_\-=@,.;]+$").unwrap());
 
 fn validate_channel_name(name: &str) -> Result<()> {
     if name.is_empty() {
@@ -174,19 +175,22 @@ fn validate_channel_name(name: &str) -> Result<()> {
             message: "Channel name cannot be empty".to_string(),
         });
     }
-    
+
     if name.len() > 200 {
         return Err(PusherError::Validation {
             message: format!("Channel name too long: '{}' (max 200 characters)", name),
         });
     }
-    
+
     if !CHANNEL_NAME_PATTERN.is_match(name) {
         return Err(PusherError::Validation {
-            message: format!("Invalid channel name: '{}'. Must match pattern: [A-Za-z0-9_\\-=@,.;]+", name),
+            message: format!(
+                "Invalid channel name: '{}'. Must match pattern: [A-Za-z0-9_\\-=@,.;]+",
+                name
+            ),
         });
     }
-    
+
     Ok(())
 }
 
@@ -206,7 +210,7 @@ mod tests {
     fn test_channel_type_detection() {
         let public = Channel::from_string("test").unwrap();
         assert_eq!(public.channel_type(), ChannelType::Public);
-        
+
         let private = Channel::from_string("private-test").unwrap();
         assert_eq!(private.channel_type(), ChannelType::Private);
     }

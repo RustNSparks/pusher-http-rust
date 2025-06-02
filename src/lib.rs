@@ -21,6 +21,7 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 pub mod auth;
+pub mod channel;
 pub mod config;
 pub mod errors;
 pub mod events;
@@ -28,24 +29,23 @@ pub mod pusher;
 pub mod token;
 pub mod util;
 pub mod webhook;
-pub mod channel;
 
 #[macro_use]
 extern crate zeroize;
 
-pub use pusher::Pusher;
+pub use channel::{Channel, ChannelName, ChannelType};
 pub use config::{Config, ConfigBuilder};
 pub use errors::{PusherError, RequestError, WebhookError};
+pub use pusher::Pusher;
 pub use token::Token;
 pub use webhook::{Webhook, WebhookEvent};
-pub use channel::{Channel, ChannelName, ChannelType};
 
 /// Result type alias for Pusher operations
 pub type Result<T> = std::result::Result<T, PusherError>;
 
 // Re-export commonly used types
-pub use events::{Event, BatchEvent, TriggerParams};
 pub use auth::{SocketAuth, UserAuth};
+pub use events::{BatchEvent, Event, TriggerParams};
 
 /// Check if encryption support is available at compile time
 pub const ENCRYPTION_AVAILABLE: bool = cfg!(feature = "encryption");

@@ -1,5 +1,5 @@
+use crate::{util, Token};
 use serde_json::Value;
-use crate::{Token, util};
 
 /// Authentication data for socket connections
 #[derive(Debug, serde::Serialize)]
@@ -51,14 +51,15 @@ pub fn get_socket_signature(
         {
             if pusher.config().encryption_master_key().is_none() {
                 return Err(crate::PusherError::Encryption {
-                    message: "Cannot generate shared_secret because encryptionMasterKey is not set".to_string(),
+                    message: "Cannot generate shared_secret because encryptionMasterKey is not set"
+                        .to_string(),
                 });
             }
 
             let shared_secret = pusher.channel_shared_secret(channel)?;
             result.shared_secret = Some(base64::Engine::encode(
                 &base64::engine::general_purpose::STANDARD,
-                &shared_secret
+                &shared_secret,
             ));
         }
 
@@ -123,13 +124,9 @@ mod tests {
         let pusher = Pusher::new(config).unwrap();
         let token = Token::new("test_key", "test_secret");
 
-        let result = get_socket_signature(
-            &pusher,
-            &token,
-            "private-encrypted-test",
-            "123.456",
-            None
-        ).unwrap();
+        let result =
+            get_socket_signature(&pusher, &token, "private-encrypted-test", "123.456", None)
+                .unwrap();
 
         assert!(result.shared_secret.is_some());
     }
@@ -150,13 +147,8 @@ mod tests {
         let pusher = Pusher::new(config).unwrap();
         let token = Token::new("test_key", "test_secret");
 
-        let result = get_socket_signature(
-            &pusher,
-            &token,
-            "private-encrypted-test",
-            "123.456",
-            None
-        );
+        let result =
+            get_socket_signature(&pusher, &token, "private-encrypted-test", "123.456", None);
 
         // Should fail with appropriate error message
         assert!(result.is_err());

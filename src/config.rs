@@ -1,5 +1,5 @@
-use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
-use crate::{Token, PusherError, Result};
+use crate::{PusherError, Result, Token};
+use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use std::time::Duration;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
@@ -55,13 +55,13 @@ impl Config {
                 message: "App ID cannot be empty".to_string(),
             });
         }
-        
+
         if self.token.key.is_empty() {
             return Err(PusherError::Config {
                 message: "App key cannot be empty".to_string(),
             });
         }
-        
+
         if let Some(ref key) = self.encryption_master_key {
             if key.0.len() != 32 {
                 return Err(PusherError::Config {
@@ -69,7 +69,7 @@ impl Config {
                 });
             }
         }
-        
+
         Ok(())
     }
 
@@ -207,7 +207,8 @@ impl ConfigBuilder {
 
     /// Sets the encryption master key from base64
     pub fn encryption_master_key_base64(self, key_base64: impl AsRef<str>) -> Result<Self> {
-        let decoded = BASE64.decode(key_base64.as_ref())
+        let decoded = BASE64
+            .decode(key_base64.as_ref())
             .map_err(|e| PusherError::Config {
                 message: format!("Invalid base64 encryption key: {}", e),
             })?;

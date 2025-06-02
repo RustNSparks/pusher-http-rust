@@ -1,6 +1,6 @@
+use crate::{PusherError, Result, Token, WebhookError};
+use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
-use serde::{Serialize, Deserialize};
-use crate::{Token, WebhookError, Result, PusherError};
 
 /// Webhook for validating and accessing Pusher webhook data
 #[derive(Debug)]
@@ -25,10 +25,20 @@ pub struct WebhookData {
 /// Strongly typed webhook event
 #[derive(Debug, Clone, PartialEq)]
 pub enum WebhookEvent {
-    ChannelOccupied { channel: String },
-    ChannelVacated { channel: String },
-    MemberAdded { channel: String, user_id: String },
-    MemberRemoved { channel: String, user_id: String },
+    ChannelOccupied {
+        channel: String,
+    },
+    ChannelVacated {
+        channel: String,
+    },
+    MemberAdded {
+        channel: String,
+        user_id: String,
+    },
+    MemberRemoved {
+        channel: String,
+        user_id: String,
+    },
     ClientEvent {
         channel: String,
         event: String,
@@ -36,19 +46,19 @@ pub enum WebhookEvent {
         socket_id: String,
         user_id: Option<String>,
     },
-    CacheMiss { channel: String, event: String },
+    CacheMiss {
+        channel: String,
+        event: String,
+    },
     Unknown(HashMap<String, String>),
 }
 
 impl Webhook {
     /// Creates a new webhook from request data
-    pub fn new(
-        token: &Token,
-        headers: &BTreeMap<String, String>,
-        body: &str,
-    ) -> Self {
+    pub fn new(token: &Token, headers: &BTreeMap<String, String>, body: &str) -> Self {
         // Normalize header names to lowercase for case-insensitive lookup
-        let normalized_headers: BTreeMap<String, String> = headers.iter()
+        let normalized_headers: BTreeMap<String, String> = headers
+            .iter()
             .map(|(k, v)| (k.to_lowercase(), v.clone()))
             .collect();
 
@@ -171,7 +181,8 @@ impl Webhook {
     /// Finds events by type
     pub fn find_events_by_type(&self, event_type: &str) -> Result<Vec<WebhookEvent>> {
         let events = self.get_events()?;
-        Ok(events.into_iter()
+        Ok(events
+            .into_iter()
             .filter(|e| e.event_name() == event_type)
             .collect())
     }
@@ -179,7 +190,8 @@ impl Webhook {
     /// Finds events by channel
     pub fn find_events_by_channel(&self, channel: &str) -> Result<Vec<WebhookEvent>> {
         let events = self.get_events()?;
-        Ok(events.into_iter()
+        Ok(events
+            .into_iter()
             .filter(|e| e.channel() == Some(channel))
             .collect())
     }
@@ -227,8 +239,12 @@ fn parse_webhook_event(raw: &HashMap<String, String>) -> WebhookEvent {
             }
         }
         Some("client_event") => {
-            if let (Some(channel), Some(event), Some(data), Some(socket_id)) = 
-                (raw.get("channel"), raw.get("event"), raw.get("data"), raw.get("socket_id")) {
+            if let (Some(channel), Some(event), Some(data), Some(socket_id)) = (
+                raw.get("channel"),
+                raw.get("event"),
+                raw.get("data"),
+                raw.get("socket_id"),
+            ) {
                 WebhookEvent::ClientEvent {
                     channel: channel.clone(),
                     event: event.clone(),
@@ -271,12 +287,12 @@ impl WebhookEvent {
     /// Gets the channel name if applicable
     pub fn channel(&self) -> Option<&str> {
         match self {
-            WebhookEvent::ChannelOccupied { channel } |
-            WebhookEvent::ChannelVacated { channel } |
-            WebhookEvent::MemberAdded { channel, .. } |
-            WebhookEvent::MemberRemoved { channel, .. } |
-            WebhookEvent::ClientEvent { channel, .. } |
-            WebhookEvent::CacheMiss { channel, .. } => Some(channel),
+            WebhookEvent::ChannelOccupied { channel }
+            | WebhookEvent::ChannelVacated { channel }
+            | WebhookEvent::MemberAdded { channel, .. }
+            | WebhookEvent::MemberRemoved { channel, .. }
+            | WebhookEvent::ClientEvent { channel, .. }
+            | WebhookEvent::CacheMiss { channel, .. } => Some(channel),
             WebhookEvent::Unknown(map) => map.get("channel").map(|s| s.as_str()),
         }
     }
@@ -284,8 +300,8 @@ impl WebhookEvent {
     /// Gets the user ID if applicable
     pub fn user_id(&self) -> Option<&str> {
         match self {
-            WebhookEvent::MemberAdded { user_id, .. } |
-            WebhookEvent::MemberRemoved { user_id, .. } => Some(user_id),
+            WebhookEvent::MemberAdded { user_id, .. }
+            | WebhookEvent::MemberRemoved { user_id, .. } => Some(user_id),
             WebhookEvent::ClientEvent { user_id, .. } => user_id.as_deref(),
             WebhookEvent::Unknown(map) => map.get("user_id").map(|s| s.as_str()),
             _ => None,
@@ -295,7 +311,7 @@ impl WebhookEvent {
     /// Converts the event back to a HashMap
     pub fn to_hashmap(&self) -> HashMap<String, String> {
         let mut map = HashMap::new();
-        
+
         match self {
             WebhookEvent::ChannelOccupied { channel } => {
                 map.insert("name".to_string(), "channel_occupied".to_string());
@@ -315,7 +331,13 @@ impl WebhookEvent {
                 map.insert("channel".to_string(), channel.clone());
                 map.insert("user_id".to_string(), user_id.clone());
             }
-            WebhookEvent::ClientEvent { channel, event, data, socket_id, user_id } => {
+            WebhookEvent::ClientEvent {
+                channel,
+                event,
+                data,
+                socket_id,
+                user_id,
+            } => {
                 map.insert("name".to_string(), "client_event".to_string());
                 map.insert("channel".to_string(), channel.clone());
                 map.insert("event".to_string(), event.clone());
@@ -334,7 +356,7 @@ impl WebhookEvent {
                 return original.clone();
             }
         }
-        
+
         map
     }
 }
@@ -351,11 +373,14 @@ mod tests {
                 {"name": "member_added", "channel": "presence-channel", "user_id": "user123"}
             ]
         }"#;
-        
+
         let data: WebhookData = serde_json::from_str(json_str).unwrap();
         assert_eq!(data.time_ms, 1234567890);
         assert_eq!(data.events.len(), 2);
-        assert_eq!(data.events[0].get("name"), Some(&"channel_occupied".to_string()));
+        assert_eq!(
+            data.events[0].get("name"),
+            Some(&"channel_occupied".to_string())
+        );
     }
 
     #[test]
@@ -363,12 +388,12 @@ mod tests {
         let token = Token::new("test_key", "test_secret");
         let body = r#"{"time_ms": 1234567890, "events": []}"#;
         let signature = token.sign(body);
-        
+
         let mut headers = BTreeMap::new();
         headers.insert("content-type".to_string(), "application/json".to_string());
         headers.insert("x-pusher-key".to_string(), "test_key".to_string());
         headers.insert("x-pusher-signature".to_string(), signature);
-        
+
         let webhook = Webhook::new(&token, &headers, body);
         assert!(webhook.is_valid(None));
     }
@@ -378,7 +403,7 @@ mod tests {
         let mut event_map = HashMap::new();
         event_map.insert("name".to_string(), "channel_occupied".to_string());
         event_map.insert("channel".to_string(), "test-channel".to_string());
-        
+
         let event = parse_webhook_event(&event_map);
         assert!(matches!(event, WebhookEvent::ChannelOccupied { .. }));
         assert_eq!(event.channel(), Some("test-channel"));
@@ -390,10 +415,10 @@ mod tests {
             channel: "presence-test".to_string(),
             user_id: "user123".to_string(),
         };
-        
+
         let map = event.to_hashmap();
         let parsed = parse_webhook_event(&map);
-        
+
         assert_eq!(event, parsed);
     }
 }

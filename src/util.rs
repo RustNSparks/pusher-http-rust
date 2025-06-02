@@ -1,17 +1,14 @@
+use regex::Regex;
 use std::collections::BTreeMap;
 use std::fmt::Write;
-use subtle::ConstantTimeEq;
 use std::sync::LazyLock;
-use regex::Regex;
+use subtle::ConstantTimeEq;
 
 // Pre-compiled regex patterns
-static SOCKET_ID_PATTERN: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"^\d+\.\d+$").unwrap()
-});
+static SOCKET_ID_PATTERN: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^\d+\.\d+$").unwrap());
 
-static USER_ID_PATTERN: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"^[a-zA-Z0-9_\-=@,.;]+$").unwrap()
-});
+static USER_ID_PATTERN: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^[a-zA-Z0-9_\-=@,.;]+$").unwrap());
 
 /// Converts a map to an ordered array of key=value pairs
 pub fn to_ordered_array(map: &BTreeMap<String, String>) -> Vec<String> {
@@ -36,10 +33,10 @@ pub fn secure_compare(a: &str, b: &str) -> bool {
     if a.len() != b.len() {
         return false;
     }
-    
+
     let a_bytes = a.as_bytes();
     let b_bytes = b.as_bytes();
-    
+
     // Use the subtle crate for constant-time comparison
     a_bytes.ct_eq(b_bytes).into()
 }
@@ -60,7 +57,10 @@ pub fn validate_channel(channel: &str) -> crate::Result<()> {
 pub fn validate_socket_id(socket_id: &str) -> crate::Result<()> {
     if !SOCKET_ID_PATTERN.is_match(socket_id) {
         return Err(crate::PusherError::Validation {
-            message: format!("Invalid socket id: '{}'. Must be in format: \\d+.\\d+", socket_id),
+            message: format!(
+                "Invalid socket id: '{}'. Must be in format: \\d+.\\d+",
+                socket_id
+            ),
         });
     }
     Ok(())
@@ -73,19 +73,22 @@ pub fn validate_user_id(user_id: &str) -> crate::Result<()> {
             message: "User ID cannot be empty".to_string(),
         });
     }
-    
+
     if user_id.len() > 200 {
         return Err(crate::PusherError::Validation {
             message: format!("User ID too long: '{}' (max 200 characters)", user_id),
         });
     }
-    
+
     if !USER_ID_PATTERN.is_match(user_id) {
         return Err(crate::PusherError::Validation {
-            message: format!("Invalid user ID: '{}'. Must match pattern: [a-zA-Z0-9_\\-=@,.;]+", user_id),
+            message: format!(
+                "Invalid user ID: '{}'. Must match pattern: [a-zA-Z0-9_\\-=@,.;]+",
+                user_id
+            ),
         });
     }
-    
+
     Ok(())
 }
 
@@ -97,17 +100,17 @@ where
 {
     let iter = items.into_iter();
     let (lower_bound, _) = iter.size_hint();
-    
+
     // Pre-allocate with estimated size
     let mut result = String::with_capacity(lower_bound * 20); // Rough estimate
-    
+
     for (i, item) in iter.enumerate() {
         if i > 0 {
             result.push_str(separator);
         }
         result.push_str(item);
     }
-    
+
     result
 }
 
@@ -180,7 +183,7 @@ mod tests {
     #[test]
     fn test_format_duration() {
         use std::time::Duration;
-        
+
         assert_eq!(format_duration(Duration::from_secs(30)), "30s");
         assert_eq!(format_duration(Duration::from_secs(90)), "1m 30s");
         assert_eq!(format_duration(Duration::from_secs(3661)), "1h 1m");
@@ -191,7 +194,7 @@ mod tests {
         let mut map = BTreeMap::new();
         map.insert("key1".to_string(), "value1".to_string());
         map.insert("key2".to_string(), "value2".to_string());
-        
+
         let result = to_ordered_array(&map);
         assert_eq!(result, vec!["key1=value1", "key2=value2"]);
     }

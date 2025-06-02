@@ -1,8 +1,8 @@
+use crate::util;
 use hmac::{Hmac, Mac};
 use sha2::Sha256;
-use zeroize::Zeroize;
-use crate::util;
 use std::fmt;
+use zeroize::Zeroize;
 
 type HmacSha256 = Hmac<Sha256>;
 
@@ -31,7 +31,7 @@ impl Token {
         let mut mac = HmacSha256::new_from_slice(self.secret.0.as_bytes())
             .expect("HMAC can take key of any size");
         mac.update(data.as_bytes());
-        
+
         // Use hex formatting directly for better performance
         format!("{:x}", mac.finalize().into_bytes())
     }
@@ -66,7 +66,7 @@ mod tests {
         let token = Token::new("test_key", "test_secret");
         let data = "test_data";
         let signature = token.sign(data);
-        
+
         assert!(token.verify(data, &signature));
         assert!(!token.verify("other_data", &signature));
         assert!(!token.verify(data, "wrong_signature"));
@@ -76,10 +76,10 @@ mod tests {
     fn test_hmac_consistency() {
         let token = Token::new("key", "secret");
         let data = "some data to sign";
-        
+
         let sig1 = token.sign(data);
         let sig2 = token.sign(data);
-        
+
         assert_eq!(sig1, sig2, "HMAC should be deterministic");
     }
 
@@ -87,7 +87,7 @@ mod tests {
     fn test_debug_redaction() {
         let token = Token::new("public_key", "secret_key");
         let debug_str = format!("{:?}", token);
-        
+
         assert!(debug_str.contains("public_key"));
         assert!(debug_str.contains("[REDACTED]"));
         assert!(!debug_str.contains("secret_key"));
