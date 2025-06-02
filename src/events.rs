@@ -3,11 +3,15 @@ use serde_json::{json, Value};
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 use crate::{Pusher, PusherError, Result, Channel};
 use std::fmt;
+
+#[cfg(all(feature = "encryption", feature = "sodiumoxide"))]
 use std::sync::Once;
 
+#[cfg(all(feature = "encryption", feature = "sodiumoxide"))]
 static SODIUM_INIT: Once = Once::new();
 
 /// Initialize sodiumoxide once
+#[cfg(all(feature = "encryption", feature = "sodiumoxide"))]
 fn init_sodium() -> Result<()> {
     SODIUM_INIT.call_once(|| {
         sodiumoxide::init().expect("Failed to initialize sodiumoxide");
@@ -74,15 +78,6 @@ impl From<Value> for EventData {
         EventData::Json(v)
     }
 }
-
-// impl<T: Serialize> From<&T> for EventData {
-//     fn from(v: &T) -> Self {
-//         match serde_json::to_value(v) {
-//             Ok(value) => EventData::Json(value),
-//             Err(_) => EventData::String(format!("{:?}", v)),
-//         }
-//     }
-// }
 
 /// Event data for triggering
 #[derive(Debug, Serialize)]
@@ -181,7 +176,22 @@ impl TriggerParamsBuilder {
 }
 
 /// Encrypts data for encrypted channels
+#[cfg(feature = "encryption")]
 fn encrypt(pusher: &Pusher, channel: &str, data: &EventData) -> Result<String> {
+    #[cfg(feature = "sodiumoxide")]
+    {
+        encrypt_sodiumoxide(pusher, channel, data)
+    }
+
+    #[cfg(not(feature = "sodiumoxide"))]
+    {
+        encrypt_pure_rust(pusher, channel, data)
+    }
+}
+
+/// Encrypts data using sodiumoxide
+#[cfg(all(feature = "encryption", feature = "sodiumoxide"))]
+fn encrypt_sodiumoxide(pusher: &Pusher, channel: &str, data: &EventData) -> Result<String> {
     init_sodium()?;
 
     // Ensure master key is present
@@ -226,6 +236,56 @@ fn encrypt(pusher: &Pusher, channel: &str, data: &EventData) -> Result<String> {
     Ok(serde_json::to_string(&encrypted_payload)?)
 }
 
+/// Encrypts data using pure Rust crypto libraries
+#[cfg(all(feature = "encryption", not(feature = "sodiumoxide")))]
+fn encrypt_pure_rust(pusher: &Pusher, channel: &str, data: &EventData) -> Result<String> {
+    use chacha20poly1305::{
+        aead::{Aead, AeadCore, KeyInit, OsRng},
+        ChaCha20Poly1305, Nonce,
+    };
+
+    // Ensure master key is present
+    let _master_key = pusher.config().encryption_master_key()
+        .ok_or_else(|| PusherError::Encryption {
+            message: "Set encryptionMasterKey before triggering events on encrypted channels".to_string(),
+        })?;
+
+    // Get channel shared secret
+    let shared_secret_bytes = pusher.channel_shared_secret(channel)?;
+
+    // Create cipher
+    let cipher = ChaCha20Poly1305::new_from_slice(&shared_secret_bytes)
+        .map_err(|_| PusherError::Encryption {
+            message: "Failed to create cipher from shared secret".to_string(),
+        })?;
+
+    // Generate random nonce
+    let nonce = ChaCha20Poly1305::generate_nonce(&mut OsRng);
+
+    // Encrypt the data
+    let data_string = data.to_string();
+    let ciphertext = cipher.encrypt(&nonce, data_string.as_bytes())
+        .map_err(|_| PusherError::Encryption {
+            message: "Encryption failed".to_string(),
+        })?;
+
+    // Return encrypted payload as JSON string
+    let encrypted_payload = json!({
+        "nonce": BASE64.encode(&nonce),
+        "ciphertext": BASE64.encode(&ciphertext),
+    });
+
+    Ok(serde_json::to_string(&encrypted_payload)?)
+}
+
+/// Stub function when encryption is disabled
+#[cfg(not(feature = "encryption"))]
+fn encrypt(_pusher: &Pusher, _channel: &str, _data: &EventData) -> Result<String> {
+    Err(PusherError::Encryption {
+        message: "Encryption support is not enabled. Enable the 'encryption' feature to use encrypted channels.".to_string(),
+    })
+}
+
 /// Triggers an event on channels
 pub async fn trigger<D: Into<EventData>>(
     pusher: &Pusher,
@@ -236,7 +296,7 @@ pub async fn trigger<D: Into<EventData>>(
 ) -> Result<reqwest::Response> {
     let data = data.into();
     let event_name = event_name.as_ref();
-    
+
     // Validate event name
     if event_name.len() > 200 {
         return Err(PusherError::Validation {
@@ -250,23 +310,33 @@ pub async fn trigger<D: Into<EventData>>(
         .collect();
 
     if channels.len() == 1 && channels[0].is_encrypted() {
-        let encrypted_data = encrypt(pusher, &channel_strings[0], &data)?;
-        
-        let mut event = Event {
-            name: event_name.to_string(),
-            data: encrypted_data,
-            channels: channel_strings,
-            socket_id: None,
-            info: None,
-        };
+        #[cfg(feature = "encryption")]
+        {
+            let encrypted_data = encrypt(pusher, &channel_strings[0], &data)?;
 
-        if let Some(params) = params {
-            event.socket_id = params.socket_id.clone();
-            event.info = params.info.clone();
+            let mut event = Event {
+                name: event_name.to_string(),
+                data: encrypted_data,
+                channels: channel_strings,
+                socket_id: None,
+                info: None,
+            };
+
+            if let Some(params) = params {
+                event.socket_id = params.socket_id.clone();
+                event.info = params.info.clone();
+            }
+
+            let event_json = serde_json::to_value(event)?;
+            pusher.post("/events", &event_json).await
         }
 
-        let event_json = serde_json::to_value(event)?;
-        pusher.post("/events", &event_json).await
+        #[cfg(not(feature = "encryption"))]
+        {
+            Err(PusherError::Encryption {
+                message: "Encryption support is not enabled. Enable the 'encryption' feature to use encrypted channels.".to_string(),
+            })
+        }
     } else {
         // Check for encrypted channels in multi-channel trigger
         for channel in channels {
@@ -332,8 +402,18 @@ pub async fn trigger_batch(
     for event in &mut batch {
         let channel = Channel::from_string(&event.channel)?;
         if channel.is_encrypted() {
-            let data = EventData::String(event.data.clone());
-            event.data = encrypt(pusher, &event.channel, &data)?;
+            #[cfg(feature = "encryption")]
+            {
+                let data = EventData::String(event.data.clone());
+                event.data = encrypt(pusher, &event.channel, &data)?;
+            }
+
+            #[cfg(not(feature = "encryption"))]
+            {
+                return Err(PusherError::Encryption {
+                    message: "Encryption support is not enabled. Enable the 'encryption' feature to use encrypted channels.".to_string(),
+                });
+            }
         }
     }
 
