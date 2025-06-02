@@ -343,7 +343,7 @@ impl Pusher {
             }
     
             let response = request
-                .header("X-Pusher-Library", "pusher-rust/1.0.0")
+                .header("X-Pusher-Library", "pushers/1.4.2")
                 .send()
                 .await;
     
