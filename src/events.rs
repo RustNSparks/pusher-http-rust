@@ -1,7 +1,8 @@
 use crate::{Channel, Pusher, PusherError, Result};
-use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
+use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
+use std::collections::HashMap;
 use std::fmt;
 
 #[cfg(all(feature = "encryption", feature = "sodiumoxide"))]
@@ -88,6 +89,8 @@ pub struct Event {
     pub socket_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub info: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tags: Option<HashMap<String, String>>,
 }
 
 /// Batch event data
@@ -100,6 +103,8 @@ pub struct BatchEvent {
     pub socket_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub info: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tags: Option<HashMap<String, String>>,
 }
 
 impl BatchEvent {
@@ -115,6 +120,7 @@ impl BatchEvent {
             data: data.into().to_string(),
             socket_id: None,
             info: None,
+            tags: None,
         }
     }
 
@@ -129,6 +135,12 @@ impl BatchEvent {
         self.info = Some(info.into());
         self
     }
+
+    /// Sets the tags for tag filtering
+    pub fn with_tags(mut self, tags: HashMap<String, String>) -> Self {
+        self.tags = Some(tags);
+        self
+    }
 }
 
 /// Parameters for triggering events
@@ -136,6 +148,7 @@ impl BatchEvent {
 pub struct TriggerParams {
     pub socket_id: Option<String>,
     pub info: Option<String>,
+    pub tags: Option<HashMap<String, String>>,
 }
 
 impl TriggerParams {
@@ -150,6 +163,7 @@ impl TriggerParams {
 pub struct TriggerParamsBuilder {
     socket_id: Option<String>,
     info: Option<String>,
+    tags: Option<HashMap<String, String>>,
 }
 
 impl TriggerParamsBuilder {
@@ -165,11 +179,18 @@ impl TriggerParamsBuilder {
         self
     }
 
+    /// Sets the tags for tag filtering
+    pub fn tags(mut self, tags: HashMap<String, String>) -> Self {
+        self.tags = Some(tags);
+        self
+    }
+
     /// Builds the TriggerParams
     pub fn build(self) -> TriggerParams {
         TriggerParams {
             socket_id: self.socket_id,
             info: self.info,
+            tags: self.tags,
         }
     }
 }
@@ -248,8 +269,8 @@ fn encrypt_sodiumoxide(pusher: &Pusher, channel: &str, data: &EventData) -> Resu
 #[cfg(all(feature = "encryption", not(feature = "sodiumoxide")))]
 fn encrypt_pure_rust(pusher: &Pusher, channel: &str, data: &EventData) -> Result<String> {
     use chacha20poly1305::{
-        aead::{Aead, AeadCore, KeyInit, OsRng},
         ChaCha20Poly1305, Nonce,
+        aead::{Aead, AeadCore, KeyInit, OsRng},
     };
 
     // Ensure master key is present
@@ -332,11 +353,13 @@ pub async fn trigger<D: Into<EventData>>(
                 channels: channel_strings,
                 socket_id: None,
                 info: None,
+                tags: None,
             };
 
             if let Some(params) = params {
                 event.socket_id = params.socket_id.clone();
                 event.info = params.info.clone();
+                event.tags = params.tags.clone();
             }
 
             let event_json = serde_json::to_value(event)?;
@@ -367,11 +390,13 @@ pub async fn trigger<D: Into<EventData>>(
             channels: channel_strings,
             socket_id: None,
             info: None,
+            tags: None,
         };
 
         if let Some(params) = params {
             event.socket_id = params.socket_id.clone();
             event.info = params.info.clone();
+            event.tags = params.tags.clone();
         }
 
         let event_json = serde_json::to_value(event)?;
@@ -471,6 +496,18 @@ mod tests {
     }
 
     #[test]
+    fn test_batch_event_with_tags() {
+        let mut tags = HashMap::new();
+        tags.insert("symbol".to_string(), "BONK".to_string());
+        tags.insert("price_usd".to_string(), "0.00001".to_string());
+
+        let event =
+            BatchEvent::new("test-event", "test-channel", "test-data").with_tags(tags.clone());
+
+        assert_eq!(event.tags, Some(tags));
+    }
+
+    #[test]
     fn test_trigger_params_builder() {
         let params = TriggerParams::builder()
             .socket_id("123.456")
@@ -479,5 +516,15 @@ mod tests {
 
         assert_eq!(params.socket_id, Some("123.456".to_string()));
         assert_eq!(params.info, Some("test-info".to_string()));
+    }
+
+    #[test]
+    fn test_trigger_params_builder_with_tags() {
+        let mut tags = HashMap::new();
+        tags.insert("event_type".to_string(), "goal".to_string());
+
+        let params = TriggerParams::builder().tags(tags.clone()).build();
+
+        assert_eq!(params.tags, Some(tags));
     }
 }
