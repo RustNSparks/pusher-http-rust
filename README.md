@@ -24,15 +24,9 @@ Add the following to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-# If publishing to crates.io:
-# pushers = "1.2.0" # Replace with the desired version
-# Or, for local development:
-pushers = { path = "./" } # Assuming the crate is in the current directory or adjust path accordingly
-
-sonic-rs = "0.3"
+pushers = "1.4.0"
+sonic-rs = "0.5"
 tokio = { version = "1", features = ["full"] }
-# reqwest is used internally but you might need it for response handling
-# reqwest = { version = "0.11", features = ["json"] }
 ```
 
 Then run:
