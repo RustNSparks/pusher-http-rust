@@ -18,7 +18,7 @@ pub enum PusherError {
     Encryption { message: String },
 
     #[error("JSON error: {0}")]
-    Json(#[from] serde_json::Error),
+    Json(#[from] sonic_rs::Error),
 
     #[error("HTTP error: {0}")]
     Http(#[from] reqwest::Error),

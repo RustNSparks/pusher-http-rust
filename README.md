@@ -8,6 +8,7 @@ A Rust client for interacting with the Pusher HTTP API, allowing you to publish 
 - Trigger events to specific users (User Authentication)
 - Trigger batch events for efficiency
 - Support for end-to-end encrypted channels
+- **Tag filtering support** for server-side publication filtering
 - Authorize client subscriptions to private, presence, and encrypted channels
 - Authenticate users for user-specific Pusher features
 - Terminate user connections
@@ -15,6 +16,7 @@ A Rust client for interacting with the Pusher HTTP API, allowing you to publish 
 - Configurable host, port, scheme (HTTP/HTTPS), and timeout
 - Asynchronous API using `async/await`
 - Typed responses and errors
+- **Fast JSON** with SIMD-accelerated `sonic-rs` library
 
 ## Installation
 
@@ -27,7 +29,7 @@ Add the following to your `Cargo.toml`:
 # Or, for local development:
 pushers = { path = "./" } # Assuming the crate is in the current directory or adjust path accordingly
 
-serde_json = "1.0"
+sonic-rs = "0.3"
 tokio = { version = "1", features = ["full"] }
 # reqwest is used internally but you might need it for response handling
 # reqwest = { version = "0.11", features = ["json"] }
@@ -47,7 +49,8 @@ cargo build
 Configure and create a `Pusher` client:
 
 ```rust
-use pushers::{Config, Pusher, PusherError}; // Adjusted to use crate name
+use pushers::{Config, Pusher, PusherError};
+use sonic_rs::json;
 
 #[tokio::main]
 async fn main() -> Result<(), PusherError> {
@@ -91,8 +94,8 @@ let pusher_from_url = Pusher::from_url(
 ### 2. Triggering Events
 
 ```rust
-use pushers::{Pusher, Channel, PusherError}; // Adjusted
-use serde_json::json;
+use pushers::{Pusher, Channel, PusherError};
+use sonic_rs::json;
 
 # async fn doc_trigger_event(pusher: &Pusher) -> Result<(), PusherError> {
 let channels = vec![Channel::from_string("my-channel")?]; // Use Channel type
@@ -116,8 +119,8 @@ If `channels` contains a single encrypted channel (e.g. `"private-encrypted-mych
 
 **Excluding a recipient**
 ```rust
-use pushers::{Pusher, Channel, PusherError, events::TriggerParams}; // Adjusted
-use serde_json::json;
+use pushers::{Pusher, Channel, PusherError, events::TriggerParams};
+use sonic_rs::json;
 
 # async fn doc_trigger_event_exclude(pusher: &Pusher) -> Result<(), PusherError> {
 let channels = vec![Channel::from_string("my-channel")?];
@@ -139,8 +142,8 @@ pusher
 ### 3. Triggering Batch Events
 
 ```rust
-use pushers::{Pusher, PusherError, events::BatchEvent}; // Adjusted
-use serde_json::json;
+use pushers::{Pusher, PusherError, events::BatchEvent};
+use sonic_rs::json;
 
 # async fn doc_trigger_batch(pusher: &Pusher) -> Result<(), PusherError> {
 let batch = vec![
@@ -150,6 +153,7 @@ let batch = vec![
         data: json!({ "value": 1 }).to_string(),
         socket_id: None,
         info: None,
+        tags: None,
     },
     BatchEvent {
         name: "event2".to_string(),
@@ -157,6 +161,7 @@ let batch = vec![
         data: json!({ "value": 2 }).to_string(),
         socket_id: None,
         info: None,
+        tags: None,
     },
 ];
 
@@ -168,14 +173,84 @@ match pusher.trigger_batch(batch).await {
 # }
 ```
 
+### 3.1. Triggering Events with Tag Filtering
+
+Tag filtering allows you to add metadata tags to events, enabling clients to filter which events they receive based on tag values. This can significantly reduce bandwidth usage (60-90%) in high-volume scenarios.
+
+**Triggering a single event with tags:**
+
+```rust
+use pushers::{Pusher, Channel, PusherError, events::TriggerParams};
+use sonic_rs::json;
+use std::collections::HashMap;
+
+# async fn doc_trigger_with_tags(pusher: &Pusher) -> Result<(), PusherError> {
+let channels = vec![Channel::from_string("sports-updates")?];
+let event_name = "match-event";
+let data = json!({
+    "match_id": "123",
+    "team": "Home",
+    "player": "John Doe",
+    "minute": 45
+});
+
+// Create tags for filtering
+let mut tags = HashMap::new();
+tags.insert("event_type".to_string(), "goal".to_string());
+tags.insert("priority".to_string(), "high".to_string());
+
+let params = TriggerParams::builder()
+    .tags(tags)
+    .build();
+
+pusher
+    .trigger(&channels, event_name, data, Some(params))
+    .await?;
+# Ok(())
+# }
+```
+
+**Triggering batch events with tags:**
+
+```rust
+use pushers::{Pusher, PusherError, events::BatchEvent};
+use sonic_rs::json;
+use std::collections::HashMap;
+
+# async fn doc_trigger_batch_with_tags(pusher: &Pusher) -> Result<(), PusherError> {
+let mut goal_tags = HashMap::new();
+goal_tags.insert("event_type".to_string(), "goal".to_string());
+goal_tags.insert("priority".to_string(), "high".to_string());
+
+let mut shot_tags = HashMap::new();
+shot_tags.insert("event_type".to_string(), "shot".to_string());
+shot_tags.insert("xG".to_string(), "0.85".to_string());
+
+let batch = vec![
+    BatchEvent::new("match-event", "match:123", json!({ "type": "goal", "player": "Smith" }))
+        .with_tags(goal_tags),
+    BatchEvent::new("match-event", "match:123", json!({ "type": "shot", "player": "Jones" }))
+        .with_tags(shot_tags),
+];
+
+match pusher.trigger_batch(batch).await {
+    Ok(response) => println!("Batch with tags triggered! Status: {}", response.status()),
+    Err(e) => eprintln!("Error triggering batch: {:?}", e),
+}
+# Ok(())
+# }
+```
+
+**Note:** Tag filtering must be enabled on the Sockudo server (`TAG_FILTERING_ENABLED=true`) for clients to filter events. Tags are key-value pairs where both keys and values are strings. Clients can subscribe with filter expressions to receive only events matching their criteria.
+
 
 ### 4. Authorizing Channels
 
 Typically done in your HTTP handler when a client attempts to subscribe:
 
 ```rust
-use pushers::{Pusher, Channel, PusherError}; // Adjusted
-use serde_json::json;
+use pushers::{Pusher, Channel, PusherError};
+use sonic_rs::json;
 
 # fn doc_authorize_channel(pusher: &Pusher) -> Result<(), PusherError> {
 // Example values from client
@@ -211,8 +286,8 @@ match pusher.authorize_channel(
 For server-to-user events:
 
 ```rust
-use pushers::{Pusher, PusherError}; // Adjusted
-use serde_json::json;
+use pushers::{Pusher, PusherError};
+use sonic_rs::json;
 
 # fn doc_authenticate_user(pusher: &Pusher) -> Result<(), PusherError> {
 // Example values from client
@@ -238,8 +313,8 @@ match pusher.authenticate_user(socket_id, &user_data) {
 ### 6. Sending an Event to a User
 
 ```rust
-use pushers::{Pusher, PusherError}; // Adjusted
-use serde_json::json;
+use pushers::{Pusher, PusherError};
+use sonic_rs::json;
 
 # async fn doc_send_to_user(pusher: &Pusher) -> Result<(), PusherError> {
 let user_id = "user-bob";
@@ -258,7 +333,7 @@ match pusher.send_to_user(user_id, event_name, data).await { // Pass data direct
 ### 7. Terminating User Connections
 
 ```rust
-use pushers::{Pusher, PusherError}; // Adjusted
+use pushers::{Pusher, PusherError};
 
 # async fn doc_terminate_user(pusher: &Pusher) -> Result<(), PusherError> {
 let user_id = "user-charlie";
@@ -275,7 +350,7 @@ match pusher.terminate_user_connections(user_id).await {
 ### 8. Handling Webhooks
 
 ```rust
-use pushers::{Pusher, PusherError, webhook::WebhookEvent}; // Adjusted
+use pushers::{Pusher, PusherError, webhook::WebhookEvent};
 use std::collections::BTreeMap;
 
 # fn doc_handle_webhook(pusher: &Pusher) -> Result<(), PusherError> {
@@ -334,9 +409,9 @@ use axum::{
     routing::post,
     Router,
 };
-use pushers::{Config, Pusher, PusherError, Channel}; // Adjusted imports
+use pushers::{Config, Pusher, PusherError, Channel};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use sonic_rs::{json, Value};
 use std::{collections::BTreeMap, sync::Arc};
 
 #[derive(Clone)]

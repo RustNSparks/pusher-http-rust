@@ -67,7 +67,7 @@ impl Webhook {
         let content_type = normalized_headers.get("content-type").cloned();
 
         let data = if Self::validate_content_type(&content_type) {
-            serde_json::from_str::<WebhookData>(body).ok()
+            sonic_rs::from_str::<WebhookData>(body).ok()
         } else {
             None
         };
@@ -374,7 +374,7 @@ mod tests {
             ]
         }"#;
 
-        let data: WebhookData = serde_json::from_str(json_str).unwrap();
+        let data: WebhookData = sonic_rs::from_str(json_str).unwrap();
         assert_eq!(data.time_ms, 1234567890);
         assert_eq!(data.events.len(), 2);
         assert_eq!(

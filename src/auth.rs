@@ -1,5 +1,5 @@
-use crate::{util, Token};
-use serde_json::Value;
+use crate::{Token, util};
+use sonic_rs::Value;
 
 /// Authentication data for socket connections
 #[derive(Debug, serde::Serialize)]
@@ -30,7 +30,7 @@ pub fn get_socket_signature(
     let mut channel_data = None;
 
     if let Some(data) = data {
-        let serialized = serde_json::to_string(data)?;
+        let serialized = sonic_rs::to_string(data)?;
         signature_data.push(serialized.clone());
         channel_data = Some(serialized);
     }
@@ -80,7 +80,7 @@ pub fn get_socket_signature_for_user(
     socket_id: &str,
     user_data: &Value,
 ) -> crate::Result<UserAuth> {
-    let serialized_user_data = serde_json::to_string(user_data)?;
+    let serialized_user_data = sonic_rs::to_string(user_data)?;
     let signature_string = format!("{}::user::{}", socket_id, serialized_user_data);
     let signature = token.sign(&signature_string);
 
@@ -93,7 +93,7 @@ pub fn get_socket_signature_for_user(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::json;
+    use sonic_rs::json;
 
     #[test]
     fn test_get_socket_signature_for_user() {

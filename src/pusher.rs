@@ -1,10 +1,10 @@
 use crate::{
-    auth, events, util, webhook::Webhook, Channel, Config, PusherError, RequestError, Result, Token,
+    Channel, Config, PusherError, RequestError, Result, Token, auth, events, util, webhook::Webhook,
 };
 use events::EventData;
 use reqwest::{Client, Response};
-use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
+use sonic_rs::{JsonValueTrait, Value, json};
 use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::time::Duration;
@@ -308,7 +308,7 @@ impl Pusher {
         params: Option<&BTreeMap<String, String>>,
     ) -> Result<Response> {
         let full_path = self.inner.config.prefix_path(path);
-        let body_str = body.map(|b| serde_json::to_string(b)).transpose()?;
+        let body_str = body.map(|b| sonic_rs::to_string(b)).transpose()?;
 
         let query_string = create_signed_query_string(
             &self.inner.config.token(),
@@ -344,7 +344,7 @@ impl Pusher {
                         &url,
                         None,
                         None,
-                    )))
+                    )));
                 }
             };
 

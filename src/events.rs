@@ -1,7 +1,7 @@
 use crate::{Channel, Pusher, PusherError, Result};
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use sonic_rs::{Value, json};
 use std::collections::HashMap;
 use std::fmt;
 
@@ -42,14 +42,14 @@ impl EventData {
     pub fn to_string(&self) -> String {
         match self {
             EventData::String(s) => s.clone(),
-            EventData::Json(v) => serde_json::to_string(v).unwrap_or_default(),
+            EventData::Json(v) => sonic_rs::to_string(v).unwrap_or_default(),
         }
     }
 
     /// Gets the event data as a JSON value
     pub fn as_json(&self) -> Result<Value> {
         match self {
-            EventData::String(s) => serde_json::from_str(s).map_err(|e| PusherError::Json(e)),
+            EventData::String(s) => sonic_rs::from_str(s).map_err(|e| PusherError::Json(e)),
             EventData::Json(v) => Ok(v.clone()),
         }
     }
@@ -262,7 +262,7 @@ fn encrypt_sodiumoxide(pusher: &Pusher, channel: &str, data: &EventData) -> Resu
         "ciphertext": BASE64.encode(&ciphertext),
     });
 
-    Ok(serde_json::to_string(&encrypted_payload)?)
+    Ok(sonic_rs::to_string(&encrypted_payload)?)
 }
 
 /// Encrypts data using pure Rust crypto libraries
@@ -310,7 +310,7 @@ fn encrypt_pure_rust(pusher: &Pusher, channel: &str, data: &EventData) -> Result
         "ciphertext": BASE64.encode(&ciphertext),
     });
 
-    Ok(serde_json::to_string(&encrypted_payload)?)
+    Ok(sonic_rs::to_string(&encrypted_payload)?)
 }
 
 /// Stub function when encryption is disabled
@@ -362,7 +362,7 @@ pub async fn trigger<D: Into<EventData>>(
                 event.tags = params.tags.clone();
             }
 
-            let event_json = serde_json::to_value(event)?;
+            let event_json = sonic_rs::to_value(&event)?;
             pusher.post("/events", &event_json).await
         }
 
@@ -399,7 +399,7 @@ pub async fn trigger<D: Into<EventData>>(
             event.tags = params.tags.clone();
         }
 
-        let event_json = serde_json::to_value(event)?;
+        let event_json = sonic_rs::to_value(&event)?;
         pusher.post("/events", &event_json).await
     }
 }
@@ -461,7 +461,7 @@ pub async fn trigger_batch(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::json;
+    use sonic_rs::json;
 
     #[test]
     fn test_event_data_conversions() {
