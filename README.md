@@ -8,7 +8,6 @@ A fast, safe, and idiomatic Rust client for interacting with the Pusher HTTP API
 - Trigger events to specific users (User Authentication)
 - Trigger batch events for efficiency
 - Support for end-to-end encrypted channels
-- **Tag filtering support** for server-side publication filtering
 - Authorize client subscriptions to private, presence, and encrypted channels
 - Authenticate users for user-specific Pusher features
 - Terminate user connections
